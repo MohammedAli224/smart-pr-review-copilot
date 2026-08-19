@@ -198,24 +198,59 @@
 
   function fallbackAnalysis(text) {
     const lower = text.toLowerCase();
-    let chosen = 'Low';
-    let bestCount = 0;
-    FALLBACK_RULES.forEach((rule) => {
-      let count = 0;
-      rule.keywords.forEach((keyword) => {
-        count += (lower.match(new RegExp(keyword, 'g')) || []).length;
-      });
-      if (count > bestCount) {
-        bestCount = count;
-        chosen = rule.level;
-      }
-    });
+  
+    const highRiskKeywords = [
+      'auth',
+      'authentication',
+      'token',
+      'password',
+      'secret',
+      'permission',
+      'role',
+      'payment',
+      'billing',
+      'schema',
+      'migration',
+      'drop table',
+      'drop column',
+      'alter table',
+      'database'
+    ];
+  
+    const mediumRiskKeywords = [
+      'service',
+      'controller',
+      'api',
+      'route',
+      'endpoint',
+      'query',
+      'transaction',
+      'cache',
+      'queue'
+    ];
+  
+    const hasHighRisk = highRiskKeywords.some((keyword) =>
+      lower.includes(keyword)
+    );
+  
+    const hasMediumRisk = mediumRiskKeywords.some((keyword) =>
+      lower.includes(keyword)
+    );
+  
+    let riskScore = 'Low';
+  
+    if (hasHighRisk) {
+      riskScore = 'High';
+    } else if (hasMediumRisk) {
+      riskScore = 'Medium';
+    }
+  
     return {
-      risk_score: chosen,
+      risk_score: riskScore,
       impacted_areas: extractImpactedAreas(text)
     };
   }
-
+  
   function callApprovedModel(prompt) {
     if (INTEGRATION_CONFIG.mode === 'external') {
       return callExternalModel(prompt);
