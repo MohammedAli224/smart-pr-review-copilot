@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart PR Review Copilot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>Smart PR Review Copilot</h1>
+    <p class="site-tagline">Paste any diff. Know your release risk before you merge.</p>
+  </header>
+
+  <main class="app">
+    <section class="panel panel-input" aria-label="Diff input">
+      <h2 class="panel-title">Changes to Review</h2>
+      <label class="sr-only" for="diff-input">Paste a diff for review</label>
+      <textarea
+        id="diff-input"
+        class="diff-input"
+        placeholder="Paste a pull request diff to assess release risk…"
+        spellcheck="false"
+      ></textarea>
+
+      <button id="analyze-btn" class="btn btn-primary" type="button">Assess Risk</button>
+
+      <div class="sample-controls">
+        <span class="sample-label">Try a sample diff:</span>
+        <button id="sample-low-btn" class="btn btn-sample" type="button" data-sample="low">Load Low</button>
+        <button id="sample-medium-btn" class="btn btn-sample" type="button" data-sample="medium">Load Medium</button>
+        <button id="sample-high-btn" class="btn btn-sample" type="button" data-sample="high">Load High</button>
+      </div>
+    </section>
+
+    <section class="panel panel-result" aria-label="Analysis result">
+      <h2 class="panel-title">Risk Assessment</h2>
+
+      <div id="result-empty" class="result-state">
+        <p class="empty-message">No review yet. Paste a diff on the left to get a risk assessment.</p>
+      </div>
+
+      <div id="result-loading" class="result-state hidden" aria-live="polite">
+        <p class="loading-message">Assessing release risk…</p>
+      </div>
+
+      <div id="error-area" class="error-area hidden" role="alert" aria-live="assertive"></div>
+
+      <div id="result-card" class="result-card hidden">
+        <div class="risk-score-card">
+          <span class="risk-label">Risk Score</span>
+          <span id="risk-score" class="risk-score" aria-live="polite">–</span>
+        </div>
+        <div class="impacted-area">
+          <span class="impact-label">Impacted Areas</span>
+          <ul id="impacted-areas" class="impacted-areas-list"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Smart PR Review Copilot · Runs 100% in your browser · Nothing leaves your device</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
