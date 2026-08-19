@@ -25,9 +25,11 @@
   const SYSTEM_PROMPT =
     'You are a code review copilot. Analyze the given Git diff. ' +
     'Respond ONLY with valid JSON in exactly this shape: ' +
-    '{"risk_score":"High","impacted_areas":["str","str"]}. ' +
-    'risk_score must be exactly Low, Medium, or High. ' +
-    'impacted_areas must contain 1 to 5 short semantic areas.';
+    '{"risk_score": "High", "impacted_areas": ["str", "str"]} ' +
+    'where risk_score is exactly one of "Low", "Medium", or "High" ' +
+    'and impacted_areas is a list of 1 to 5 short items describing the areas affected by the diff.';
+
+  
 
   const MOCK_SAMPLES = {
     low: [
@@ -51,7 +53,6 @@
       '+  Get started',
       ' </button>'
     ].join('\n'),
-
     medium: [
       'diff --git a/app/controllers/OrderController.php b/app/controllers/OrderController.php',
       'index a1b2c3d..e4f5a6b 100644',
@@ -74,7 +75,6 @@
       '+        $this->stock->decrement($sku, $qty);',
       '+        $this->stock->hold($batchId);'
     ].join('\n'),
-
     high: [
       'diff --git a/db/migrations/002_add_payments.sql b/db/migrations/002_add_payments.sql',
       'index 1112223..4445556 100644',
@@ -99,7 +99,6 @@
   function setLoading(isLoading) {
     els.analyzeBtn.disabled = isLoading;
     els.loading.classList.toggle('hidden', !isLoading);
-
     if (isLoading) {
       els.empty.classList.add('hidden');
       els.card.classList.add('hidden');
@@ -121,195 +120,280 @@
     return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   }
 
-  function containsAny(text, keywords) {
-    return keywords.some((keyword) => text.includes(keyword));
-  }
-
   function extractImpactedAreas(diff) {
-    const lower = diff.toLowerCase();
     const areas = [];
-
-    const rules = [
+    const lower = diff.toLowerCase();
+  
+    const semanticRules = [
       {
         label: 'Authentication',
-        keywords: ['auth/', '/auth', 'authentication', 'password', 'login', 'session', 'credential']
+        keywords: [
+          'auth/',
+          '/auth',
+          'authentication',
+          'token',
+          'password',
+          'login',
+          'session',
+          'credential'
+        ]
       },
       {
         label: 'Payments',
-        keywords: ['payment', 'payments', 'billing', 'checkout', 'invoice', 'charge']
+        keywords: [
+          'payment',
+          'payments',
+          'billing',
+          'checkout',
+          'invoice',
+          'charge'
+        ]
       },
       {
         label: 'Database Schema',
-        keywords: ['migration', 'migrations', 'schema', '.sql', 'alter table', 'drop table', 'drop column']
+        keywords: [
+          'migration',
+          'migrations',
+          'schema',
+          '.sql',
+          'alter table',
+          'drop table',
+          'drop column'
+        ]
       },
       {
         label: 'Public API',
-        keywords: ['api/', '/api', 'endpoint', 'route', 'controller']
+        keywords: [
+          'api/',
+          '/api',
+          'endpoint',
+          'route',
+          'controller'
+        ]
       },
       {
         label: 'API Layer',
-        keywords: ['handler', 'service']
+        keywords: [
+          'handler',
+          'service'
+        ]
       },
       {
         label: 'UI Layer',
-        keywords: ['.css', '.scss', '.html', '.jsx', '.tsx', 'component', 'button', 'template']
+        keywords: [
+          '.css',
+          '.scss',
+          '.html',
+          '.jsx',
+          '.tsx',
+          'component',
+          'button',
+          'template'
+        ]
       },
       {
         label: 'Data Storage',
-        keywords: ['json.dump', 'json.load', 'file_path', 'open(', 'write(', 'storage', 'record', 'trajs']
+        keywords: [
+          'json.dump',
+          'json.load',
+          'file_path',
+          'open(',
+          'write(',
+          'storage',
+          'record',
+          'trajs'
+        ]
       },
       {
         label: 'Business Logic',
-        keywords: ['update_record', 'get_reward', 'get_metrics', 'process', 'repository', 'usecase']
+        keywords: [
+          'update_record',
+          'get_reward',
+          'get_metrics',
+          'process',
+          'repository',
+          'usecase'
+        ]
       }
     ];
-
-    rules.forEach((rule) => {
-      if (areas.length < 5 && containsAny(lower, rule.keywords)) {
+  
+    semanticRules.forEach((rule) => {
+      if (
+        areas.length < 5 &&
+        rule.keywords.some((keyword) => lower.includes(keyword))
+      ) {
         areas.push(rule.label);
       }
     });
-
+  
     if (areas.length === 0) {
       areas.push('General code changes');
     }
-
+  
     return areas.slice(0, 5);
+  }
+  
+    function hitsKeyword(text, keyword) {
+      if (keyword.length <= 3) {
+        return new RegExp('(^|[^a-z0-9])' + keyword + '([^a-z0-9]|$)', 'i').test(text);
+      }
+      return text.indexOf(keyword) !== -1;
+    }
+
+  function cleanModuleName(file) {
+    const base = file.replace(/\\/g, '/').split('/').pop();
+    const name = base.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ');
+    return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
   function fallbackAnalysis(text) {
     const lower = text.toLowerCase();
-
+  
     const highRiskKeywords = [
-      'auth/', '/auth', 'authentication', 'token', 'password', 'secret',
-      'permission', 'role', 'payment', 'payments', 'billing', 'schema',
-      'migration', 'drop table', 'drop column', 'alter table', 'database'
+      'auth/',
+      '/auth',
+      'authentication',
+      'token',
+      'password',
+      'secret',
+      'permission',
+      'role',
+      'payment',
+      'payments',
+      'billing',
+      'schema',
+      'migration',
+      'drop table',
+      'drop column',
+      'alter table',
+      'database'
     ];
-
+  
     const mediumRiskKeywords = [
-      'service', 'controller', 'api/', '/api', 'endpoint', 'route',
-      'query', 'transaction', 'cache', 'queue', 'repository', 'business logic'
+      'service',
+      'controller',
+      'api/',
+      '/api',
+      'endpoint',
+      'route',
+      'query',
+      'transaction',
+      'cache',
+      'queue',
+      'repository',
+      'business logic'
     ];
-
+  
+    const hasHighRisk = highRiskKeywords.some((keyword) =>
+      lower.includes(keyword)
+    );
+  
+    const hasMediumRisk = mediumRiskKeywords.some((keyword) =>
+      lower.includes(keyword)
+    );
+  
     let riskScore = 'Low';
-
-    if (containsAny(lower, highRiskKeywords)) {
+  
+    if (hasHighRisk) {
       riskScore = 'High';
-    } else if (containsAny(lower, mediumRiskKeywords)) {
+    } else if (hasMediumRisk) {
       riskScore = 'Medium';
     }
-
+  
     return {
       risk_score: riskScore,
       impacted_areas: extractImpactedAreas(text)
     };
   }
-
   function callMockModel(prompt) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const result = fallbackAnalysis(prompt);
-          resolve(JSON.stringify(result));
-        } catch (error) {
-          reject(error);
-        }
-      }, INTEGRATION_CONFIG.timeoutMs);
-    });
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        const result = fallbackAnalysis(prompt);
+
+        resolve(JSON.stringify({
+          risk_score: result.risk_score,
+          impacted_areas: result.impacted_areas
+        }));
+      } catch (error) {
+        reject(error);
+      }
+    }, INTEGRATION_CONFIG.timeoutMs);
+  });
+}
+
+function callApprovedModel(prompt) {
+  if (INTEGRATION_CONFIG.mode === 'external') {
+    return callExternalModel(prompt);
   }
 
-  function callApprovedModel(prompt) {
-    if (INTEGRATION_CONFIG.mode === 'external') {
-      return callExternalModel(prompt);
-    }
-
-    return callMockModel(prompt);
-  }
-
+  return callMockModel(prompt);
+}
   function buildExternalRequest(prompt) {
     const headers = { 'Content-Type': 'application/json' };
-
     if (INTEGRATION_CONFIG.apiKey) {
-      headers.Authorization = 'Bearer ' + INTEGRATION_CONFIG.apiKey;
+      headers['Authorization'] = 'Bearer ' + INTEGRATION_CONFIG.apiKey;
     }
-
     return {
       method: 'POST',
-      headers,
-      body: JSON.stringify({ prompt })
+      headers: headers,
+      body: JSON.stringify({ prompt: prompt })
     };
   }
 
-  async function callExternalModel(prompt) {
-    if (!INTEGRATION_CONFIG.endpoint) {
-      throw new Error('Model endpoint is not configured');
-    }
-
-    const controller = new AbortController();
-    const timer = setTimeout(
-      () => controller.abort(),
-      INTEGRATION_CONFIG.timeoutMs
-    );
-
-    try {
-      const response = await fetch(
-        INTEGRATION_CONFIG.endpoint,
-        {
-          ...buildExternalRequest(prompt),
-          signal: controller.signal
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Model request failed with status ' + response.status);
+  function callExternalModel(prompt) {
+    return new Promise((resolve, reject) => {
+      if (!INTEGRATION_CONFIG.endpoint) {
+        reject(new Error('Model endpoint is not configured'));
+        return;
       }
-
-      const text = await response.text();
-
-      if (!text.trim()) {
-        throw new Error('Model returned an empty response');
-      }
-
-      const data = JSON.parse(text);
-
-      if (!isValidResult(data)) {
-        throw new Error('Model returned invalid JSON');
-      }
-
-      return JSON.stringify(data);
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Model request timed out');
-      }
-
-      throw error;
-    } finally {
-      clearTimeout(timer);
-    }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), INTEGRATION_CONFIG.timeoutMs);
+      fetch(INTEGRATION_CONFIG.endpoint, Object.assign(buildExternalRequest(prompt), { signal: controller.signal }))
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Model request failed with status ' + response.status);
+          }
+          return response.text();
+        })
+        .then((text) => {
+          if (!text || !text.trim()) {
+            throw new Error('Model returned an empty response');
+          }
+          const data = JSON.parse(text);
+          if (!isValidResult(data)) {
+            throw new Error('Model returned invalid JSON');
+          }
+          return data;
+        })
+        .then(
+          (data) => resolve(JSON.stringify(data)),
+          (err) => {
+            clearTimeout(timer);
+            reject(err && err.name === 'AbortError' ? new Error('Model request timed out') : err);
+          }
+        );
+    });
   }
 
   function isValidResult(data) {
-    return Boolean(
+    return (
       data &&
       typeof data === 'object' &&
-      ['Low', 'Medium', 'High'].includes(data.risk_score) &&
-      Array.isArray(data.impacted_areas) &&
-      data.impacted_areas.length >= 1 &&
-      data.impacted_areas.length <= 5
+      typeof data.risk_score === 'string' &&
+      Array.isArray(data.impacted_areas)
     );
   }
 
   function renderResult(data) {
-    const level = data.risk_score.toLowerCase();
-    const badgeClass = ['low', 'medium', 'high'].includes(level)
-      ? level
-      : 'medium';
+    const level = String(data.risk_score).toLowerCase();
+    const badgeClass = ['low', 'medium', 'high'].includes(level) ? level : 'medium';
 
     els.riskScore.textContent = capitalize(level);
     els.riskScore.className = 'risk-score ' + badgeClass;
     els.riskCard.className = 'risk-score-card ' + badgeClass;
-    els.impactedAreas.innerHTML = '';
 
+    els.impactedAreas.innerHTML = '';
     data.impacted_areas.slice(0, 5).forEach((area) => {
       const li = document.createElement('li');
       li.textContent = area;
@@ -322,25 +406,73 @@
 
   async function analyzeDiff(text) {
     setLoading(true);
-
     try {
-      const prompt =
-        SYSTEM_PROMPT +
-        '\n\nHere is the Git diff to analyze:\n"""\n' +
-        text +
-        '\n"""';
-
+      const prompt = SYSTEM_PROMPT + '\n\nHere is the Git diff to analyze:\n"""\n' + text + '\n"""';
       const raw = await callApprovedModel(prompt);
       const data = JSON.parse(raw);
-
       if (!isValidResult(data)) {
         throw new Error('Invalid model response');
       }
-
       renderResult(data);
-    } catch (error) {
+    } catch (err) {
       renderResult(fallbackAnalysis(text));
     } finally {
       setLoading(false);
     }
   }
+
+  async function loadSample(type) {
+    try {
+      const response = await fetch('samples/' + type + '.diff');
+      if (!response.ok) {
+        throw new Error('Sample not found');
+      }
+      els.input.value = await response.text();
+    } catch (err) {
+      els.input.value = MOCK_SAMPLES[type] || '';
+    }
+    hideError();
+  }
+  
+  function clearAnalysis() {
+    els.input.value = '';
+  
+    els.empty.classList.remove('hidden');
+    els.loading.classList.add('hidden');
+    els.card.classList.add('hidden');
+  
+    els.riskScore.textContent = '';
+    els.riskScore.className = 'risk-score';
+    els.riskCard.className = 'risk-score-card';
+  
+    els.impactedAreas.innerHTML = '';
+    hideError();
+  }
+  
+  els.analyzeBtn.addEventListener('click', () => {
+    const text = els.input.value.trim();
+  
+    if (!text) {
+      showError('Please paste a Git diff before analyzing.');
+      return;
+    }
+  
+    const looksLikeDiff = /(^|\n)(diff --git|@@ )|\n[+-][^+-]/.test(text);
+  
+    if (!looksLikeDiff) {
+      showError('Input does not look like a Git diff.');
+      return;
+    }
+  
+    analyzeDiff(text);
+  });
+  
+  els.clearBtn.addEventListener('click', clearAnalysis);
+  
+  els.sampleButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      loadSample(btn.dataset.sample);
+    });
+  });
+})();
+ده الكود كامل عدله انت و ادينى النتيجة النهائية الصقها هناك
