@@ -343,21 +343,42 @@
     }
     hideError();
   }
-
+  
+  function clearAnalysis() {
+    els.input.value = '';
+  
+    els.empty.classList.remove('hidden');
+    els.loading.classList.add('hidden');
+    els.card.classList.add('hidden');
+  
+    els.riskScore.textContent = '';
+    els.riskScore.className = 'risk-score';
+    els.riskCard.className = 'risk-score-card';
+  
+    els.impactedAreas.innerHTML = '';
+    hideError();
+  }
+  
   els.analyzeBtn.addEventListener('click', () => {
     const text = els.input.value.trim();
+  
     if (!text) {
       showError('Please paste a Git diff before analyzing.');
       return;
     }
+  
     const looksLikeDiff = /(^|\n)(diff --git|@@ )|\n[+-][^+-]/.test(text);
+  
     if (!looksLikeDiff) {
       showError('Input does not look like a Git diff.');
       return;
     }
+  
     analyzeDiff(text);
   });
-
+  
+  els.clearBtn.addEventListener('click', clearAnalysis);
+  
   els.sampleButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       loadSample(btn.dataset.sample);
