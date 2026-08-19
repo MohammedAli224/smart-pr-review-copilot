@@ -11,6 +11,7 @@
   const els = {
     input: document.getElementById('diff-input'),
     analyzeBtn: document.getElementById('analyze-btn'),
+    clearBtn: document.getElementById('clear-btn'),
     sampleButtons: Array.from(document.querySelectorAll('.btn-sample')),
     empty: document.getElementById('result-empty'),
     loading: document.getElementById('result-loading'),
