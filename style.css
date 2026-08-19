@@ -129,6 +129,26 @@ body {
   cursor: not-allowed;
 }
 
+.action-row {
+  display: flex;
+  gap: 10px;
+}
+
+.action-row .btn-primary {
+  flex: 1;
+}
+
+.btn-secondary {
+  background: #ffffff;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .sample-controls {
   display: flex;
   align-items: center;
@@ -315,5 +335,12 @@ body {
 
   .panel {
     min-height: 0;
+  }
+   .action-row {
+    flex-direction: column;
+  }
+
+  .action-row .btn {
+    width: 100%;
   }
 }
