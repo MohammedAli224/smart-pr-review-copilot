@@ -137,58 +137,102 @@
 
   function extractImpactedAreas(diff) {
     const areas = [];
-    const seen = new Set();
-
-    const files = [];
-    const fileRegex = /^diff --git a\/.+ b\/(.+)$/gm;
-    let match;
-    while ((match = fileRegex.exec(diff)) !== null) {
-      const file = match[1].trim();
-      if (!seen.has(file)) {
-        seen.add(file);
-        files.push(file);
+    const lower = diff.toLowerCase();
+  
+    const semanticRules = [
+      {
+        label: 'Authentication',
+        keywords: [
+          'auth/',
+          '/auth',
+          'authentication',
+          'token',
+          'password',
+          'login',
+          'session'
+        ]
+      },
+      {
+        label: 'Payments',
+        keywords: ['payment', 'payments', 'billing', 'checkout', 'invoice']
+      },
+      {
+        label: 'Database Schema',
+        keywords: [
+          'schema',
+          'migration',
+          'migrations',
+          'alter table',
+          'drop table',
+          'drop column',
+          '.sql'
+        ]
+      },
+      {
+        label: 'Public API',
+        keywords: ['api/', '/api', 'endpoint', 'route', 'controller']
+      },
+      {
+        label: 'UI Layer',
+        keywords: [
+          '.css',
+          '.scss',
+          '.html',
+          '.jsx',
+          '.tsx',
+          'component',
+          'button'
+        ]
+      },
+      {
+        label: 'Data Storage',
+        keywords: [
+          'json.dump',
+          'json.load',
+          'file_path',
+          'open(',
+          'write(',
+          'storage',
+          'record',
+          'trajs'
+        ]
+      },
+      {
+        label: 'Business Logic',
+        keywords: [
+          'service',
+          'repository',
+          'usecase',
+          'update_record',
+          'get_reward',
+          'get_metrics',
+          'process'
+        ]
       }
-    }
-
-    const signal = [];
-    diff.split('\n').forEach((line) => {
-      if (/^@@/.test(line) || /^[+-][^+-]/.test(line)) {
-        signal.push(line);
-      }
-    });
-
-    const corpus = files.join('\n') + '\n' + signal.join('\n');
-
-    SEMANTIC_AREA_RULES.forEach((rule) => {
-      if (areas.length >= 5) return;
-      if (rule.keywords.some((keyword) => hitsKeyword(corpus, keyword))) {
+    ];
+  
+    semanticRules.forEach((rule) => {
+      if (
+        areas.length < 5 &&
+        rule.keywords.some((keyword) => lower.includes(keyword))
+      ) {
         areas.push(rule.label);
       }
     });
-
+  
     if (areas.length === 0) {
-      files.forEach((file) => {
-        if (areas.length >= 5) return;
-        const name = cleanModuleName(file);
-        if (name && areas.indexOf(name) === -1) {
-          areas.push(name);
-        }
-      });
+      areas.push('General code changes');
     }
-
-    if (areas.length === 0) {
-      areas.push('Miscellaneous changes');
-    }
-
-    return areas;
+  
+    return areas.slice(0, 5);
   }
-
-  function hitsKeyword(text, keyword) {
-    if (keyword.length <= 3) {
-      return new RegExp('(^|[^a-z0-9])' + keyword + '([^a-z0-9]|$)', 'i').test(text);
+  
+    function hitsKeyword(text, keyword) {
+      if (keyword.length <= 3) {
+        return new RegExp('(^|[^a-z0-9])' + keyword + '([^a-z0-9]|$)', 'i').test(text);
+      }
+      return text.indexOf(keyword) !== -1;
     }
-    return text.indexOf(keyword) !== -1;
-  }
 
   function cleanModuleName(file) {
     const base = file.replace(/\\/g, '/').split('/').pop();
@@ -200,7 +244,8 @@
     const lower = text.toLowerCase();
   
     const highRiskKeywords = [
-      'auth',
+      'auth/',
+      '/auth',
       'authentication',
       'token',
       'password',
@@ -208,6 +253,7 @@
       'permission',
       'role',
       'payment',
+      'payments',
       'billing',
       'schema',
       'migration',
@@ -220,13 +266,16 @@
     const mediumRiskKeywords = [
       'service',
       'controller',
-      'api',
-      'route',
+      'api/',
+      '/api',
       'endpoint',
+      'route',
       'query',
       'transaction',
       'cache',
-      'queue'
+      'queue',
+      'repository',
+      'business logic'
     ];
   
     const hasHighRisk = highRiskKeywords.some((keyword) =>
@@ -249,29 +298,6 @@
       risk_score: riskScore,
       impacted_areas: extractImpactedAreas(text)
     };
-  }
-  
-  function callApprovedModel(prompt) {
-    if (INTEGRATION_CONFIG.mode === 'external') {
-      return callExternalModel(prompt);
-    }
-    return callMockModel(prompt);
-  }
-
-  function callMockModel(prompt) {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const mock = fallbackAnalysis(prompt);
-          resolve(JSON.stringify({
-            risk_score: mock.risk_score,
-            impacted_areas: mock.impacted_areas
-          }));
-        } catch (err) {
-          reject(err);
-        }
-      }, INTEGRATION_CONFIG.timeoutMs);
-    });
   }
 
   function buildExternalRequest(prompt) {
