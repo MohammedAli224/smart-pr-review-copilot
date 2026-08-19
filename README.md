@@ -1,3 +1,8 @@
+try the app :
+
+https://mohammedali224.github.io/smart-pr-review-copilot/
+
+
 # Smart PR Review Copilot
 
 A single-page web app that turns a pasted Git diff into an instant pull request risk assessment.
