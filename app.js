@@ -29,22 +29,7 @@
     'where risk_score is exactly one of "Low", "Medium", or "High" ' +
     'and impacted_areas is a list of 1 to 5 short items describing the areas affected by the diff.';
 
-  const FALLBACK_RULES = [
-    { level: 'High', keywords: ['schema', 'auth', 'payment'] },
-    { level: 'Medium', keywords: ['service', 'controller'] },
-    { level: 'Low', keywords: ['ui', 'css'] }
-  ];
-
-  const SEMANTIC_AREA_RULES = [
-    { label: 'Database Schema', keywords: ['migration', 'schema', 'sql', 'table', 'column'] },
-    { label: 'Authentication', keywords: ['auth', 'token', 'login', 'session', 'secret', 'credential'] },
-    { label: 'Payments', keywords: ['payment', 'billing', 'checkout', 'invoice', 'charge'] },
-    { label: 'Public API', keywords: ['api', 'endpoint', 'route'] },
-    { label: 'API Layer', keywords: ['controller', 'handler', 'service'] },
-    { label: 'Order Processing', keywords: ['order'] },
-    { label: 'Inventory', keywords: ['inventory', 'stock', 'warehouse'] },
-    { label: 'UI Layer', keywords: ['ui', 'css', 'template', 'html', 'view', 'component', 'style'] }
-  ];
+  
 
   const MOCK_SAMPLES = {
     low: [
@@ -149,28 +134,49 @@
           'token',
           'password',
           'login',
-          'session'
+          'session',
+          'credential'
         ]
       },
       {
         label: 'Payments',
-        keywords: ['payment', 'payments', 'billing', 'checkout', 'invoice']
+        keywords: [
+          'payment',
+          'payments',
+          'billing',
+          'checkout',
+          'invoice',
+          'charge'
+        ]
       },
       {
         label: 'Database Schema',
         keywords: [
-          'schema',
           'migration',
           'migrations',
+          'schema',
+          '.sql',
           'alter table',
           'drop table',
-          'drop column',
-          '.sql'
+          'drop column'
         ]
       },
       {
         label: 'Public API',
-        keywords: ['api/', '/api', 'endpoint', 'route', 'controller']
+        keywords: [
+          'api/',
+          '/api',
+          'endpoint',
+          'route',
+          'controller'
+        ]
+      },
+      {
+        label: 'API Layer',
+        keywords: [
+          'handler',
+          'service'
+        ]
       },
       {
         label: 'UI Layer',
@@ -181,7 +187,8 @@
           '.jsx',
           '.tsx',
           'component',
-          'button'
+          'button',
+          'template'
         ]
       },
       {
@@ -200,13 +207,12 @@
       {
         label: 'Business Logic',
         keywords: [
-          'service',
-          'repository',
-          'usecase',
           'update_record',
           'get_reward',
           'get_metrics',
-          'process'
+          'process',
+          'repository',
+          'usecase'
         ]
       }
     ];
@@ -299,7 +305,30 @@
       impacted_areas: extractImpactedAreas(text)
     };
   }
+  function callMockModel(prompt) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        const result = fallbackAnalysis(prompt);
 
+        resolve(JSON.stringify({
+          risk_score: result.risk_score,
+          impacted_areas: result.impacted_areas
+        }));
+      } catch (error) {
+        reject(error);
+      }
+    }, INTEGRATION_CONFIG.timeoutMs);
+  });
+}
+
+function callApprovedModel(prompt) {
+  if (INTEGRATION_CONFIG.mode === 'external') {
+    return callExternalModel(prompt);
+  }
+
+  return callMockModel(prompt);
+}
   function buildExternalRequest(prompt) {
     const headers = { 'Content-Type': 'application/json' };
     if (INTEGRATION_CONFIG.apiKey) {
